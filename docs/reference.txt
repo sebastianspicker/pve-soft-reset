@@ -1,0 +1,19 @@
+# Reference Snapshot: quasi-vanilla Proxmox VE host
+
+This file is intentionally a compact snapshot, not executable logic.
+
+## Baseline Principle
+
+Vanilla host means packages and repos from Debian + Proxmox (optionally Ceph).
+Third-party detection in `pve-soft-reset.sh` is based on APT origin metadata.
+
+## Typical Signals
+
+- APT sources are limited to Debian/Proxmox (plus optional Ceph).
+- Running services are mostly standard PVE services.
+- `/opt/*` and `/usr/local/bin/*` are often empty or minimal on vanilla nodes.
+
+## Usage
+
+Use this as a human reference when interpreting audit output.
+For exact behavior, rely on the script and CLI docs.

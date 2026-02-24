@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck bats jq
+
+      - name: Bash syntax check
+        run: bash -n pve-soft-reset.sh
+
+      - name: ShellCheck
+        run: shellcheck -x pve-soft-reset.sh
+
+      - name: Bats
+        run: bats tests

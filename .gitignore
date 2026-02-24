@@ -1,0 +1,12 @@
+# Editor and OS
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+
+# Local / IDE – Cursor plans and project data (not part of release)
+.cursor/
+.gemini/
