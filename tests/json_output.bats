@@ -35,3 +35,24 @@ setup() {
   echo "$output" | jq -e '.third_party_with_origin | type == "array"' >/dev/null
   echo "$output" | jq -e '.storage_ids | type == "array"' >/dev/null
 }
+
+@test "--json includes additive metadata fields and warnings array" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+
+  run env STORAGE_CFG="$STORAGE_CFG_PATH" PVE_SOFT_RESET_TEST_MODE=1 "$SCRIPT" --json --non-interactive --include-storage local --exclude-storage local-lvm
+  [ "$status" -eq 0 ]
+
+  echo "$output" | jq -e '.meta.non_interactive == true' >/dev/null
+  echo "$output" | jq -e '.meta.scope.include == "local"' >/dev/null
+  echo "$output" | jq -e '.meta.scope.exclude == "local-lvm"' >/dev/null
+  echo "$output" | jq -e '.warnings | type == "array"' >/dev/null
+}
+
+@test "--json-pretty prints valid JSON with indentation" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+
+  run env STORAGE_CFG="$STORAGE_CFG_PATH" PVE_SOFT_RESET_TEST_MODE=1 "$SCRIPT" --json --json-pretty
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e . >/dev/null
+  printf '%s\n' "$output" | grep -q '^  "meta"'
+}
