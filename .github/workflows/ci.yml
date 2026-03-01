@@ -22,5 +22,11 @@ jobs:
       - name: ShellCheck
         run: shellcheck -x pve-soft-reset.sh
 
+      - name: ShellCheck lib
+        run: shellcheck -x lib/*.bash
+
+      - name: Docs link check
+        run: ./scripts/check-doc-links.sh
+
       - name: Bats
         run: bats tests

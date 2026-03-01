@@ -5,6 +5,9 @@
 ## Top-Level Structure
 
 - `meta` (object)
+  - `non_interactive` (boolean)
+  - `scope.include` (string)
+  - `scope.exclude` (string)
 - `wipe_dir_entries` (array of strings)
 - `wipe_lvm_entries` (array of strings)
 - `wipe_zfs_entries` (array of strings)
@@ -14,6 +17,7 @@
 - `purge_packages` (array of strings)
 - `purge_dirs` (array of strings)
 - `storage_ids` (array of strings)
+- `warnings` (array of strings)
 - `firewall_stack` (string)
 - `reset_pve_config` (boolean)
 - `reset_users_datacenter` (boolean)
@@ -35,4 +39,10 @@ Examples:
 
 ```bash
 ./pve-soft-reset.sh --json | jq -e .
+```
+
+Pretty-printed output is available with:
+
+```bash
+./pve-soft-reset.sh --json --json-pretty
 ```
