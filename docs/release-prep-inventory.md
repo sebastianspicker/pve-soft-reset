@@ -21,12 +21,16 @@ Snapshot classification for the current release-prep branch.
 - `CHANGELOG.md`
 - `docs/release-checklist.md`
 - `docs/release-notes-draft.md`
+- `docs/audit-findings.md`
 - `scripts/check-doc-links.sh`
 
 ## Test artifacts (kept)
 
 - `tests/audit_storage.bats`
+- `tests/audit_third_party.bats`
+- `tests/execute_wipe.bats`
 - `tests/json_output.bats`
+- `tests/reset_pve_config.bats`
 - `tests/safety_guards.bats`
 - `tests/helpers/common.bash`
 - `tests/fixtures/storage.cfg.basic`

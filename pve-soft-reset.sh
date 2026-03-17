@@ -45,6 +45,7 @@ SSH_KEYS_FOUND=false
 
 STORAGE_IDS_DISCOVERED=()
 WARNINGS=()
+ERRORS=()
 
 # -----------------------------------------------------------------------------
 # Load libs (order matters: helpers need state; storage_scope needs helpers; etc.)
@@ -69,7 +70,6 @@ run_audit_pipeline() {
   log_info "Starting audit pipeline"
 
   audit_storage_cfg "$STORAGE_CFG"
-  collect_storage_ids
   apply_storage_scope_filters
 
   check_dependencies
@@ -120,7 +120,7 @@ main() {
     log_info "Executing dry-run"
     run_execution_phases
     print_final_summary "$start_time"
-    if [[ $FAILURE_COUNT -gt 0 ]]; then
+    if (( FAILURE_COUNT > 0 )); then
       exit "$EXIT_RUNTIME"
     fi
     exit "$EXIT_OK"
@@ -135,7 +135,7 @@ main() {
   run_execution_phases
   print_final_summary "$start_time"
 
-  if [[ $FAILURE_COUNT -gt 0 ]]; then
+  if (( FAILURE_COUNT > 0 )); then
     log_error "$FAILURE_COUNT action(s) failed. Check log: $LOG_FILE"
     exit "$EXIT_RUNTIME"
   fi

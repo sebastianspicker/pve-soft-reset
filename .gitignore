@@ -12,3 +12,5 @@ report-*.txt
 # Local / IDE – Cursor plans and project data (not part of release)
 .cursor/
 .gemini/
+.claude/
+progress.md

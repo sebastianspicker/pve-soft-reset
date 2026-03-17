@@ -2,6 +2,11 @@
 # WIPE_* and STORAGE_IDS_DISCOVERED are used by main and other libs.
 # shellcheck disable=SC2034
 
+# _COLLECT_IDS_TMP and _FILTERED_ENTRIES_TMP are intentional module-level globals.
+# Bash callbacks invoked via for_each_sep_entry run in a separate call frame and cannot
+# write to local variables declared in the caller — so these globals act as accumulators.
+# Always reset them immediately before the for_each_sep_entry call that uses them.
+
 # Append first field (storage id) of each entry in named array to _COLLECT_IDS_TMP.
 _collect_ids_from_array() {
   for_each_sep_entry "$1" "_collect_ids_callback"
@@ -19,9 +24,7 @@ collect_storage_ids() {
 
   STORAGE_IDS_DISCOVERED=()
   if [[ ${#_COLLECT_IDS_TMP[@]} -gt 0 ]]; then
-    while IFS= read -r line; do
-      [[ -n "$line" ]] && STORAGE_IDS_DISCOVERED+=("$line")
-    done < <(printf "%s\n" "${_COLLECT_IDS_TMP[@]}" | sort -u)
+    mapfile -t STORAGE_IDS_DISCOVERED < <(printf "%s\n" "${_COLLECT_IDS_TMP[@]}" | sort -u)
   fi
 }
 
@@ -88,6 +91,7 @@ apply_storage_scope_filters() {
 }
 
 # Filter a wipe-style array in place: keep only entries whose first field (storage id) passes scope.
+# Uses _FILTERED_ENTRIES_TMP as the callback accumulator (see module-level comment above).
 filter_entry_array_by_scope() {
   # shellcheck disable=SC2178
   local -n arr=$1
