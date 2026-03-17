@@ -2,11 +2,16 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -17,13 +22,10 @@ jobs:
           sudo apt-get install -y shellcheck bats jq
 
       - name: Bash syntax check
-        run: bash -n pve-soft-reset.sh
+        run: bash -n pve-soft-reset.sh lib/*.bash
 
       - name: ShellCheck
-        run: shellcheck -x pve-soft-reset.sh
-
-      - name: ShellCheck lib
-        run: shellcheck -x lib/*.bash
+        run: shellcheck -x pve-soft-reset.sh lib/*.bash
 
       - name: Docs link check
         run: ./scripts/check-doc-links.sh

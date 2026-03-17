@@ -75,7 +75,7 @@ parse_args() {
   $PLAN_ONLY && ((mode_count+=1))
   $LIST_STORAGE && ((mode_count+=1))
   $JSON_OUTPUT && ((mode_count+=1))
-  [[ $mode_count -gt 1 ]] && die_usage "Use only one of: --dry-run, --audit-only, --plan, --list-storage, --json"
+  (( mode_count > 1 )) && die_usage "Use only one of: --dry-run, --audit-only, --plan, --list-storage, --json"
 
   if $PLAN_ONLY; then
     CONFIRM=false
@@ -125,11 +125,7 @@ validate_config_paths() {
   [[ -z "$pve_etc_canon" || "$pve_etc_canon" != "/etc/pve" ]] && die_preflight "PVE_ETC must resolve to /etc/pve (current: $PVE_ETC)"
   PVE_ETC="/etc/pve"
 
-  if [[ -f "$STORAGE_CFG" ]]; then
-    storage_cfg_canon="$(safe_realpath "$STORAGE_CFG")"
-  else
-    storage_cfg_canon="$(safe_realpath "$STORAGE_CFG")"
-  fi
+  storage_cfg_canon="$(safe_realpath "$STORAGE_CFG")"
   [[ -z "$storage_cfg_canon" ]] && storage_cfg_canon="$STORAGE_CFG"
 
   case "$storage_cfg_canon" in
@@ -194,20 +190,48 @@ check_dependencies() {
   fi
 }
 
+_is_blacklisted_base() {
+  case "$1" in
+    "/"|"/etc"|"/etc/pve"\
+      |"/root"|"/var"|"/usr"|"/home"|"/opt"\
+      |"/proc"|"/sys"|"/boot"|"/dev"\
+      |"/run"|"/tmp"|"/srv")
+      return 0 ;;
+  esac
+  return 1
+}
+
 ensure_safety_guards() {
-  local allowed_bases allowed
+  local allowed_bases allowed normalized
   allowed_bases="$(get_allowed_dir_bases)"
   if [[ -z "${allowed_bases//[[:space:]]}" ]]; then
     die_preflight "ALLOWED_DIR_STORAGE_BASE must not be empty or whitespace-only"
   fi
   while IFS= read -r allowed; do
-    case "$allowed" in
-      ""|"/"|"/etc"|"/etc/"|"/root"|"/root/"|"/var"|"/var/"|"/usr"|"/usr/"|"/home"|"/home/"|"/opt"|"/opt/")
-        die_preflight "ALLOWED_DIR_STORAGE_BASE contains blacklisted path: '$allowed'"
-        ;;
-    esac
+    normalized="${allowed%/}"
+    [[ -z "$normalized" ]] && normalized="/"
+    if _is_blacklisted_base "$normalized"; then
+      die_preflight "ALLOWED_DIR_STORAGE_BASE contains blacklisted path: '$allowed'"
+    fi
+    # Also check canonical path: a symlink pointing to a blacklisted dir would
+    # bypass the raw-string check above, since is_local_dir_path_simple uses the
+    # canonical form of ALLOWED_DIR_STORAGE_BASE when qualifying wipe targets.
+    if [[ -e "$allowed" ]]; then
+      local allowed_canon
+      allowed_canon="$(safe_realpath "$allowed")"
+      if [[ -n "$allowed_canon" ]]; then
+        local canon_norm="${allowed_canon%/}"
+        [[ -z "$canon_norm" ]] && canon_norm="/"
+        if _is_blacklisted_base "$canon_norm"; then
+          die_preflight "ALLOWED_DIR_STORAGE_BASE resolves to blacklisted path: '$allowed' -> '$allowed_canon'"
+        fi
+      fi
+    fi
   done <<< "$allowed_bases"
 }
+
+# Returns 0 if $1 equals $2 or starts with $2/.
+_path_under_prefix() { [[ "$1" == "$2" || "$1" == "$2"/* ]]; }
 
 path_points_to_pve_cfg() {
   local candidate="$1"
@@ -228,29 +252,13 @@ path_points_to_pve_cfg() {
   pve_norm="$(normalize_abs_path_lexical "$pve_canon")"
   [[ -z "$pve_norm" ]] && pve_norm="/etc/pve"
 
-  case "$candidate_abs" in
-    /etc/pve|/etc/pve/*|"$pve_canon"|"$pve_canon"/*)
-      return 0
-      ;;
-    *)
-      ;;
-  esac
-
-  case "$candidate_norm" in
-    /etc/pve|/etc/pve/*|"$pve_norm"|"$pve_norm"/*)
-      return 0
-      ;;
-    *)
-      ;;
-  esac
-
-  case "$candidate_canon" in
-    /etc/pve|/etc/pve/*|"$pve_canon"|"$pve_canon"/*|"$pve_norm"|"$pve_norm"/*)
-      return 0
-      ;;
-    *)
-      ;;
-  esac
+  _path_under_prefix "$candidate_abs"   "/etc/pve"   && return 0
+  _path_under_prefix "$candidate_abs"   "$pve_canon" && return 0
+  _path_under_prefix "$candidate_norm"  "/etc/pve"   && return 0
+  _path_under_prefix "$candidate_norm"  "$pve_norm"  && return 0
+  _path_under_prefix "$candidate_canon" "/etc/pve"   && return 0
+  _path_under_prefix "$candidate_canon" "$pve_canon" && return 0
+  _path_under_prefix "$candidate_canon" "$pve_norm"  && return 0
   return 1
 }
 
@@ -283,6 +291,29 @@ normalize_abs_path_lexical() {
   printf "%s" "$out"
 }
 
+# Shared safety guard: reject $1 (raw path) / $2 (canonical) if it is a symlink,
+# a directory, under /etc/pve (raw or canonical), or its parent dir is under /etc/pve.
+# $3 is the label used in error messages (e.g. "Report file", "Log file").
+_assert_file_path_safe() {
+  local file="$1" canon="$2" label="$3"
+  if [[ -L "$file" ]]; then
+    die_preflight "$label must not be a symlink: $file"
+  fi
+  if [[ -d "$file" ]]; then
+    die_preflight "$label must not be a directory: $file"
+  fi
+  if path_points_to_pve_cfg "$file"; then
+    die_preflight "$label must not be under /etc/pve (would risk config corruption): $file"
+  fi
+  if path_points_to_pve_cfg "$canon"; then
+    die_preflight "$label must not resolve under /etc/pve (would risk config corruption): $file"
+  fi
+  local dir; dir="$(dirname "$file")"
+  if [[ -d "$dir" ]] && path_points_to_pve_cfg "$dir"; then
+    die_preflight "$label directory must not point to /etc/pve: $dir"
+  fi
+}
+
 validate_report_file_path() {
   [[ -z "$REPORT_FILE" ]] && return 0
 
@@ -290,27 +321,12 @@ validate_report_file_path() {
   report_canon="$(safe_realpath "$REPORT_FILE")"
   [[ -z "$report_canon" ]] && report_canon="$REPORT_FILE"
 
-  if path_points_to_pve_cfg "$REPORT_FILE"; then
-    die_preflight "Report file must not be under /etc/pve (would risk config corruption): $REPORT_FILE"
-  fi
-  if path_points_to_pve_cfg "$report_canon"; then
-    die_preflight "Report file must not resolve under /etc/pve (would risk config corruption): $REPORT_FILE"
-  fi
+  _assert_file_path_safe "$REPORT_FILE" "$report_canon" "Report file"
 
   local report_dir
   report_dir="$(dirname "$REPORT_FILE")"
   [[ -d "$report_dir" ]] || die_preflight "Report file directory does not exist: $report_dir"
   [[ -w "$report_dir" ]] || die_preflight "Report file directory is not writable: $report_dir"
-  if path_points_to_pve_cfg "$report_dir"; then
-    die_preflight "Report file directory must not point to /etc/pve: $report_dir"
-  fi
-
-  if [[ -e "$REPORT_FILE" && -d "$REPORT_FILE" ]]; then
-    die_preflight "Report file must not be a directory: $REPORT_FILE"
-  fi
-  if [[ -L "$REPORT_FILE" ]]; then
-    die_preflight "Report file must not be a symlink: $REPORT_FILE"
-  fi
 }
 
 validate_log_file_path() {
@@ -318,28 +334,7 @@ validate_log_file_path() {
   log_canon="$(safe_realpath "$LOG_FILE")"
   [[ -z "$log_canon" ]] && log_canon="$LOG_FILE"
 
-  # Refuse to log to a symlink to avoid appending to an unintended target.
-  if [[ -L "$LOG_FILE" ]]; then
-    die_preflight "Log file must not be a symlink: $LOG_FILE"
-  fi
-
-  # Refuse to log under /etc/pve to avoid corrupting or overwriting PVE config files.
-  if path_points_to_pve_cfg "$LOG_FILE"; then
-    die_preflight "Log file must not be under /etc/pve (would risk config corruption): $LOG_FILE"
-  fi
-  if path_points_to_pve_cfg "$log_canon"; then
-    die_preflight "Log file must not resolve under /etc/pve (would risk config corruption): $LOG_FILE"
-  fi
-
-  if [[ -d "$LOG_FILE" ]]; then
-    die_preflight "Log file must not be a directory: $LOG_FILE"
-  fi
-
-  local log_dir
-  log_dir="$(dirname "$LOG_FILE")"
-  if [[ -d "$log_dir" ]] && path_points_to_pve_cfg "$log_dir"; then
-    die_preflight "Log file directory must not point to /etc/pve: $log_dir"
-  fi
+  _assert_file_path_safe "$LOG_FILE" "$log_canon" "Log file"
 }
 
 setup_runtime() {
@@ -366,8 +361,8 @@ setup_runtime() {
     else
       local size=0
       # GNU stat (Linux/Proxmox); BSD uses stat -f%z
-      size="$(stat -c%s "$LOG_FILE" 2>/dev/null || echo 0)"
-      if [[ "$size" -gt 10485760 ]]; then
+      size="$(stat -c%s "$LOG_FILE" 2>/dev/null || printf '0')"
+      if (( size > 10485760 )); then
         mv "$LOG_FILE" "${LOG_FILE}.old" 2>/dev/null || true
         touch "$LOG_FILE" 2>/dev/null || true
         chmod 0600 "$LOG_FILE" 2>/dev/null || true

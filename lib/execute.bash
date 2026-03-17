@@ -9,6 +9,9 @@ execute_wipe_dirs() {
   local entry storage_id basepath subdirs base_canon
   local sub_arr=()
   local sub dir dir_canon
+  local had_nullglob had_dotglob
+  local files=()
+  local f
 
   for entry in "${WIPE_DIR_ENTRIES[@]}"; do
     [[ -z "$entry" ]] && continue
@@ -39,12 +42,12 @@ execute_wipe_dirs() {
         log_info "Wiping directory contents: ${dir} (storage: ${storage_id})"
         color_reset
 
-        local had_nullglob=false had_dotglob=false
+        had_nullglob=false; had_dotglob=false
         shopt -q nullglob && had_nullglob=true
         shopt -q dotglob && had_dotglob=true
         shopt -s nullglob dotglob
 
-        local files=("${dir}"/*)
+        files=("${dir}"/*)
 
         if ! $had_nullglob; then
           shopt -u nullglob
@@ -58,7 +61,6 @@ execute_wipe_dirs() {
           continue
         fi
 
-        local f
         for f in "${files[@]}"; do
           if [[ -L "$f" ]]; then
             rm -f "$f" || ((FAILURE_COUNT+=1))
@@ -188,50 +190,19 @@ execute_reset_mappings() {
   done < <(find "$map_dir" -mindepth 1 -maxdepth 1 -type d -print0 2>/dev/null)
 }
 
-run_clear_cfg_actions() {
-  # shellcheck disable=SC2178
-  local -n actions=$1
-  local action path label
-  for action in "${actions[@]}"; do
-    [[ -z "$action" ]] && continue
-    split_sep "$action"
-    path="$PIPE_LEFT"
-    label="$PIPE_RIGHT"
-    clear_cfg_if_exists "$path" "$label"
-  done
-}
-
-run_remove_file_actions() {
-  # shellcheck disable=SC2178
-  local -n actions=$1
-  local action path label
-  for action in "${actions[@]}"; do
-    [[ -z "$action" ]] && continue
-    split_sep "$action"
-    path="$PIPE_LEFT"
-    label="$PIPE_RIGHT"
-    remove_file_if_exists "$path" "$label"
-  done
-}
-
-run_wipe_dir_actions() {
-  # shellcheck disable=SC2178
-  local -n actions=$1
-  local action path label
-  for action in "${actions[@]}"; do
-    [[ -z "$action" ]] && continue
-    split_sep "$action"
-    path="$PIPE_LEFT"
-    label="$PIPE_RIGHT"
-    wipe_dir_contents "$path" "$label"
-  done
-}
+# Each function iterates a SEP-joined "path${SEP}label" array and dispatches to
+# the corresponding helper. Entries are processed via for_each_sep_entry so that
+# the split/dispatch logic is not duplicated here.
+run_clear_cfg_actions()   { for_each_sep_entry "$1" "clear_cfg_if_exists"; }
+run_remove_file_actions() { for_each_sep_entry "$1" "remove_file_if_exists"; }
+run_wipe_dir_actions()    { for_each_sep_entry "$1" "wipe_dir_contents"; }
 
 execute_reset_pve_config() {
   local node_name
   node_name="$(resolve_node_name)"
   if [[ ! "$node_name" =~ ^[A-Za-z0-9_.-]+$ ]]; then
     log_error "Invalid hostname for PVE node path: $node_name"
+    ((FAILURE_COUNT+=1))
     return 1
   fi
 
@@ -347,7 +318,7 @@ add_sep_minus_one_to_var() {
   for e in "${arr[@]}"; do
     [[ -z "$e" ]] && continue
     sep_count="$(printf "%s" "$e" | tr -cd "$SEP" | wc -c)"
-    add=0; [[ "$sep_count" -gt 0 ]] && add=$((sep_count - 1))
+    add=0; (( sep_count > 0 )) && add=$(( sep_count - 1 ))
     sum=$((sum + add))
   done
   declare -g "$dest_var=$((${!dest_var:-0} + sum))"
@@ -372,7 +343,7 @@ run_execution_phases() {
   add_sep_minus_one_to_var WIPE_ZFS_ENTRIES ZFS_REMOVED
   maybe_sync
 
-  if [[ "$RESET_PVE_CONFIG" == "true" || "$RESET_USERS_DATACENTER" == "true" || "$RESET_STORAGE_CFG" == "true" ]]; then
+  if $RESET_PVE_CONFIG || $RESET_USERS_DATACENTER || $RESET_STORAGE_CFG; then
     if ! check_cluster_quorum; then
       log_warn "Skipping config reset operations due to missing quorum"
       RESET_PVE_CONFIG=false
@@ -381,7 +352,7 @@ run_execution_phases() {
     fi
   fi
 
-  if [[ "$BACKUP_CONFIG" == "true" && ( "$RESET_PVE_CONFIG" == "true" || "$RESET_USERS_DATACENTER" == "true" || "$RESET_STORAGE_CFG" == "true" ) ]]; then
+  if $BACKUP_CONFIG && { $RESET_PVE_CONFIG || $RESET_USERS_DATACENTER || $RESET_STORAGE_CFG; }; then
     execute_backup_pve_config
   fi
 
@@ -402,13 +373,13 @@ run_execution_phases() {
     execute_reset_pve_config || true
   fi
 
-  if [[ "$CEPH_FOUND" == "true" ]]; then
+  if $CEPH_FOUND; then
     if confirm_action "Remove Ceph configuration/data (/etc/ceph, /var/lib/ceph)?"; then
       execute_reset_ceph
     fi
   fi
 
-  if [[ "$SSH_KEYS_FOUND" == "true" ]]; then
+  if $SSH_KEYS_FOUND; then
     if confirm_action "Remove Proxmox cluster keys from authorized_keys?"; then
       execute_reset_ssh_keys
     fi

@@ -37,11 +37,13 @@ Safety notes:
 
 ## Reset Flags
 
-- `--reset-pve-config`
-- `--reset-users-datacenter`
-- `--reset-storage-cfg`
-- `--reset-all` (combines all reset flags)
-- `--backup-config`
+- `--reset-pve-config`: reset guest configs, SDN, mappings, jobs, firewall, and HA.
+- `--reset-users-datacenter`: reset users/ACL/secrets/datacenter to minimal defaults.
+- `--reset-storage-cfg`: overwrite storage.cfg with the vanilla default.
+- `--reset-all`: equivalent to all three reset flags above.
+- `--backup-config`: back up `/etc/pve` before reset operations (only runs when combined with a reset flag).
+
+All reset operations require cluster quorum and prompt for confirmation unless `--yes` is set.
 
 ## Third-Party Cleanup
 

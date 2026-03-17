@@ -49,8 +49,12 @@ add_warning() {
   local msg="$1"
   WARNINGS+=("$msg")
 }
+add_error() {
+  local msg="$1"
+  ERRORS+=("$msg")
+}
 log_warn()    { add_warning "$*"; _log_line "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: $*" "WARN"; }
-log_error()   { _log_line "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" "ERROR"; }
+log_error()   { add_error "$*";   _log_line "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" "ERROR"; }
 log_success() { _log_line "[$(date '+%Y-%m-%d %H:%M:%S')] $*" "SUCCESS"; }
 log_dry()     { _log_line "[DRY-RUN] $*" "INFO"; }
 
@@ -123,11 +127,15 @@ trim() {
   printf "%s" "$var"
 }
 
+# Split $1 on the first SEP; sets globals PIPE_LEFT (before) and PIPE_RIGHT (after).
 split_sep() {
   PIPE_LEFT="${1%%"$SEP"*}"
   PIPE_RIGHT="${1#*"$SEP"}"
 }
 
+# Iterate a SEP-joined entry array by name and invoke callback(left, right) for each.
+# $1: name of the array variable (passed by name, not value)
+# $2: name of the callback function to invoke with (PIPE_LEFT, PIPE_RIGHT)
 for_each_sep_entry() {
   # shellcheck disable=SC2178
   local -n arr_ref=$1
@@ -146,18 +154,17 @@ resolve_node_name() {
     node="$(readlink /etc/pve/local 2>/dev/null || true)"
     node="${node##*/}"
   fi
-  [[ -z "$node" ]] && node="$(hostname -s 2>/dev/null || cat /etc/hostname 2>/dev/null || echo "")"
+  [[ -z "$node" ]] && node="$(hostname -s 2>/dev/null || cat /etc/hostname 2>/dev/null || printf '')"
   printf "%s" "$node"
 }
 
+# Canonicalize path $1 using realpath -m (allows non-existent paths) if available,
+# falling back to realpath, then readlink -f. Prints the canonical path or empty on failure.
 safe_realpath() {
-  local p="$1"
+  local p="$1" result
   if command -v realpath >/dev/null 2>&1; then
-    if realpath -m -- "$p" >/dev/null 2>&1; then
-      realpath -m -- "$p" 2>/dev/null || printf ""
-    else
-      realpath -- "$p" 2>/dev/null || printf ""
-    fi
+    result="$(realpath -m -- "$p" 2>/dev/null)" && { printf "%s" "$result"; return 0; }
+    realpath -- "$p" 2>/dev/null || printf ""
   else
     readlink -f -- "$p" 2>/dev/null || printf ""
   fi
@@ -168,7 +175,7 @@ is_safe_subdir() {
   [[ -z "$sub" ]] && return 1
   [[ "$sub" == *".."* ]] && return 1
   [[ "$sub" == /* ]] && return 1
-  case "$sub" in *[*?]*|*'*'*) return 1 ;; esac
+  case "$sub" in *[*?]*) return 1 ;; esac
   return 0
 }
 
@@ -257,6 +264,9 @@ run_or_dry() {
   return 0
 }
 
+# NOTE: intentionally inverted return semantics for use with `&& return 0`.
+# Returns 0 (true) when in dry-run mode — callers use `_run_or_dry_preamble ... && return 0`
+# to short-circuit execution. Returns 1 (false) when real execution should proceed.
 _run_or_dry_preamble() {
   local dry_msg="$1"
   local exec_msg="$2"

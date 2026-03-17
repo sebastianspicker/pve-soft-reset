@@ -1,12 +1,13 @@
 # pve-soft-reset
 
 [![CI](https://github.com/sebastian/pve-soft-reset/actions/workflows/ci.yml/badge.svg)](https://github.com/sebastian/pve-soft-reset/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Audit-based soft reset for Proxmox VE hosts, without reinstalling the OS.
 
 The script audits the current host state, derives actions from live data, and can then execute or simulate cleanup/reset steps. Third-party package detection is based on APT origin (Debian, Proxmox, and optionally Ceph).
 
-**Requirements:** Bash 4+, Proxmox VE host; root (or equivalent) is required for execute mode.
+**Requirements:** Bash 4+, Proxmox VE host; execute mode requires root.
 
 ## What It Does
 
@@ -145,13 +146,7 @@ sudo ./pve-soft-reset.sh
 
 ## Testing
 
-```bash
-bash -n pve-soft-reset.sh
-shellcheck -x pve-soft-reset.sh
-shellcheck -x lib/*.bash
-./scripts/check-doc-links.sh
-bats tests
-```
+See [Testing Guide](docs/testing.md) for the full test suite and development notes.
 
 ## Migration Notes (v1.2.0)
 

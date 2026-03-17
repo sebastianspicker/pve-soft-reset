@@ -13,7 +13,10 @@ bats tests
 ## Test Layout
 
 - `tests/audit_storage.bats`: storage parsing, node/disabled handling, include/exclude scope.
+- `tests/audit_third_party.bats`: third-party package detection by origin, unknown-origin fallback, purge target inclusion.
+- `tests/execute_wipe.bats`: LVM/ZFS/dir wipe planned actions, protected volume exclusion, dry-run output.
 - `tests/json_output.bats`: JSON validity + stable array keys.
+- `tests/reset_pve_config.bats`: PVE config reset for VM/CT/SDN/jobs artifacts, hostname validation guard.
 - `tests/safety_guards.bats`: usage/preflight exit codes, no-color, plan no-side-effect behavior, non-interactive/report-file/json-pretty guardrails.
 - `tests/fixtures/storage.cfg.basic`: canonical fixture with placeholder base path.
 - `tests/helpers/common.bash`: mock command setup for deterministic testing.
@@ -25,6 +28,8 @@ bats tests
 - External system commands are mocked for deterministic behavior.
 - CI runs Bash syntax check, ShellCheck, and Bats.
 
-## Development / security
+## Security constraints
 
-Safety measures implemented in the script include: log file must not be a symlink, a directory, or under `/etc/pve`; `ALLOWED_DIR_STORAGE_BASE` blacklist includes `/`, `/etc`, `/root`, `/var`, `/usr`, `/home`, `/opt`; `CONFIGS_CLEARED` only incremented on success; `csv_to_array` restricted to known output variable names. When changing audit or execution logic, run the full test suite and ShellCheck.
+The log file must not be a symlink, a directory, or under `/etc/pve`. `ALLOWED_DIR_STORAGE_BASE` is blacklisted against `/`, `/etc`, `/etc/pve`, `/root`, `/var`, `/usr`, `/home`, `/opt`, `/proc`, `/sys`, `/boot`, `/dev`, `/run`, `/tmp`, and `/srv`. `CONFIGS_CLEARED` increments only on success. `csv_to_array` accepts only known output variable names. `VANILLA_ORIGINS` tokens are individually regex-escaped before alternation to prevent pattern injection.
+
+When changing audit or execution logic, run the full test suite and ShellCheck.

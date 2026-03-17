@@ -28,6 +28,6 @@ while IFS= read -r match; do
     echo "README references non-existent documentation artifact: $match" >&2
     exit 1
   fi
-done < <(rg -o --no-filename 'docs/[A-Za-z0-9._/-]+' "$README_FILE" | sort -u)
+done < <(grep -Eo 'docs/[A-Za-z0-9._/-]+' "$README_FILE" | sort -u)
 
 echo "Documentation link checks passed"

@@ -22,29 +22,6 @@ _report_file_printf() {
   printf "$fmt" "$@" >> "$REPORT_FILE"
 }
 
-json_array_pretty() {
-  local indent="$1"
-  local close_indent="$2"
-  shift 2
-  local first=1
-  local item
-  printf "["
-  for item in "$@"; do
-    [[ -z "$item" ]] && continue
-    if [[ $first -eq 1 ]]; then
-      first=0
-    else
-      printf ","
-    fi
-    printf "\n%s\"%s\"" "$indent" "$(printf "%s" "$item" | tr "$SEP" '|' | json_escape)"
-  done
-  if [[ $first -eq 1 ]]; then
-    printf "]"
-  else
-    printf "\n%s]" "$close_indent"
-  fi
-}
-
 # -----------------------------------------------------------------------------
 # Reporting
 # -----------------------------------------------------------------------------
@@ -104,7 +81,7 @@ output_json_compact() {
   printf '"meta":{'
   printf '"version":"%s",' "$VERSION"
   printf '"timestamp":"%s",' "$(date -Iseconds)"
-  printf '"hostname":"%s",' "$(hostname 2>/dev/null || echo unknown)"
+  printf '"hostname":"%s",' "$(printf "%s" "$(hostname 2>/dev/null || printf 'unknown')" | json_escape)"
   printf '"failure_count":%s,' "${FAILURE_COUNT:-0}"
   printf '"mode":"%s",' "$EXEC_MODE"
   printf '"non_interactive":%s,' "$(bool_json "$NON_INTERACTIVE")"
@@ -153,7 +130,13 @@ output_json_compact() {
   json_array "${WARNINGS[@]}"
   printf '],'
 
+  printf '"errors":['
+  json_array "${ERRORS[@]}"
+  printf '],'
+
   printf '"firewall_stack":"%s",' "$(printf "%s" "$FIREWALL_STACK" | json_escape)"
+  printf '"ceph_found":%s,' "$(bool_json "$CEPH_FOUND")"
+  printf '"ssh_keys_found":%s,' "$(bool_json "$SSH_KEYS_FOUND")"
   printf '"reset_pve_config":%s,' "$(bool_json "$RESET_PVE_CONFIG")"
   printf '"reset_users_datacenter":%s,' "$(bool_json "$RESET_USERS_DATACENTER")"
   printf '"reset_storage_cfg":%s,' "$(bool_json "$RESET_STORAGE_CFG")"
@@ -162,72 +145,10 @@ output_json_compact() {
   printf '}\n'
 }
 
-output_json_pretty() {
-  printf "{\n"
-  printf "  \"meta\": {\n"
-  printf "    \"version\": \"%s\",\n" "$(printf "%s" "$VERSION" | json_escape)"
-  printf "    \"timestamp\": \"%s\",\n" "$(date -Iseconds)"
-  printf "    \"hostname\": \"%s\",\n" "$(hostname 2>/dev/null || echo unknown)"
-  printf "    \"failure_count\": %s,\n" "${FAILURE_COUNT:-0}"
-  printf "    \"mode\": \"%s\",\n" "$(printf "%s" "$EXEC_MODE" | json_escape)"
-  printf "    \"non_interactive\": %s,\n" "$(bool_json "$NON_INTERACTIVE")"
-  printf "    \"scope\": {\n"
-  printf "      \"include\": \"%s\",\n" "$(printf "%s" "${INCLUDE_STORAGE_CSV:-}" | json_escape)"
-  printf "      \"exclude\": \"%s\"\n" "$(printf "%s" "${EXCLUDE_STORAGE_CSV:-}" | json_escape)"
-  printf "    }\n"
-  printf "  },\n"
-
-  printf "  \"wipe_dir_entries\": "
-  json_array_pretty "    " "  " "${WIPE_DIR_ENTRIES[@]}"
-  printf ",\n"
-
-  printf "  \"wipe_lvm_entries\": "
-  json_array_pretty "    " "  " "${WIPE_LVM_ENTRIES[@]}"
-  printf ",\n"
-
-  printf "  \"wipe_zfs_entries\": "
-  json_array_pretty "    " "  " "${WIPE_ZFS_ENTRIES[@]}"
-  printf ",\n"
-
-  printf "  \"third_party_packages\": "
-  json_array_pretty "    " "  " "${THIRD_PARTY_PACKAGES[@]}"
-  printf ",\n"
-
-  printf "  \"third_party_with_origin\": "
-  json_array_pretty "    " "  " "${THIRD_PARTY_WITH_ORIGIN[@]}"
-  printf ",\n"
-
-  printf "  \"purge_services\": "
-  json_array_pretty "    " "  " "${PURGE_SERVICES[@]}"
-  printf ",\n"
-
-  printf "  \"purge_packages\": "
-  json_array_pretty "    " "  " "${PURGE_PACKAGES[@]}"
-  printf ",\n"
-
-  printf "  \"purge_dirs\": "
-  json_array_pretty "    " "  " "${PURGE_DIRS[@]}"
-  printf ",\n"
-
-  printf "  \"storage_ids\": "
-  json_array_pretty "    " "  " "${STORAGE_IDS_DISCOVERED[@]}"
-  printf ",\n"
-
-  printf "  \"warnings\": "
-  json_array_pretty "    " "  " "${WARNINGS[@]}"
-  printf ",\n"
-
-  printf "  \"firewall_stack\": \"%s\",\n" "$(printf "%s" "$FIREWALL_STACK" | json_escape)"
-  printf "  \"reset_pve_config\": %s,\n" "$(bool_json "$RESET_PVE_CONFIG")"
-  printf "  \"reset_users_datacenter\": %s,\n" "$(bool_json "$RESET_USERS_DATACENTER")"
-  printf "  \"reset_storage_cfg\": %s,\n" "$(bool_json "$RESET_STORAGE_CFG")"
-  printf "  \"no_sync\": %s\n" "$(bool_json "$NO_SYNC")"
-  printf "}\n"
-}
-
 output_json() {
   if $JSON_PRETTY; then
-    output_json_pretty
+    command -v python3 >/dev/null 2>&1 || die_preflight "--json-pretty requires python3"
+    output_json_compact | python3 -m json.tool --indent 2
   else
     output_json_compact
   fi
@@ -248,7 +169,7 @@ emit_summary_with_sink() {
   "$sink_fn" "Config files changed:    %s\n" "$CONFIGS_CLEARED"
   "$sink_fn" "Failures:                %s\n" "$FAILURE_COUNT"
   "$sink_fn" "Elapsed:                 %ss\n" "$elapsed"
-  "$sink_fn" "Exit state:              %s\n" "$([[ $FAILURE_COUNT -eq 0 ]] && echo success || echo partial-failure)"
+  "$sink_fn" "Exit state:              %s\n" "$( (( FAILURE_COUNT == 0 )) && printf success || printf partial-failure )"
   "$sink_fn" "=============================\n\n"
 }
 

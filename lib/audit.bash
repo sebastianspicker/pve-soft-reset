@@ -290,7 +290,7 @@ build_package_origins_cache() {
         continue
       fi
 
-      if [[ "$in_installed_block" -eq 1 ]]; then
+      if (( in_installed_block == 1 )); then
         if [[ "$line" =~ release[[:space:]]+o=([^,]+) ]]; then
           origin="${BASH_REMATCH[1]}"
           in_installed_block=0
@@ -313,25 +313,30 @@ audit_third_party_by_origin() {
   THIRD_PARTY_PACKAGES=()
   THIRD_PARTY_WITH_ORIGIN=()
 
-  local vanilla_origins_re="$VANILLA_ORIGINS"
-  [[ "$VANILLA_INCLUDE_CEPH" == "1" ]] && vanilla_origins_re="$vanilla_origins_re Ceph"
-  vanilla_origins_re="${vanilla_origins_re// /|}"
-  vanilla_origins_re="$(printf "%s" "$vanilla_origins_re" | sed 's/[.*+?\[\]()^$\\{}]/\\&/g')"
+  # Build alternation regex by escaping each origin token individually before joining
+  # with | — prevents regex injection if VANILLA_ORIGINS contains metacharacters or |.
+  local vanilla_origins_re=""
+  local _origins_arr=()
+  read -r -a _origins_arr <<< "$VANILLA_ORIGINS"
+  [[ "$VANILLA_INCLUDE_CEPH" == "1" ]] && _origins_arr+=("Ceph")
+  local _vo
+  for _vo in "${_origins_arr[@]}"; do
+    [[ -z "$_vo" ]] && continue
+    _vo="$(printf "%s" "$_vo" | sed 's/[.*+?\[\]()^$\\{}|]/\\&/g')"
+    vanilla_origins_re="${vanilla_origins_re:+${vanilla_origins_re}|}${_vo}"
+  done
 
   # shellcheck disable=SC2153
   local vanilla_uri_patterns="$VANILLA_URI_PATTERNS"
   [[ "$VANILLA_INCLUDE_CEPH" == "1" ]] && vanilla_uri_patterns="$vanilla_uri_patterns ceph.com"
 
   local all_installed=()
-  local pkg
-  while IFS= read -r pkg; do
-    [[ -n "$pkg" ]] && all_installed+=("$pkg")
-  done < <(dpkg-query -f '${binary:Package}\n' -W 2>/dev/null)
+  mapfile -t all_installed < <(dpkg-query -f '${binary:Package}\n' -W 2>/dev/null)
 
   log_info "Collecting package origin metadata..."
   build_package_origins_cache "${all_installed[@]}"
 
-  local result host is_vanilla pat_arr=() pat
+  local result host is_vanilla pat_arr=() pat pkg
   for pkg in "${all_installed[@]}"; do
     result="${PACKAGE_ORIGINS_CACHE["$pkg"]:-}"
 
@@ -352,14 +357,14 @@ audit_third_party_by_origin() {
           break
         fi
       done
-      if [[ "$is_vanilla" -eq 0 ]]; then
+      if (( is_vanilla == 0 )); then
         THIRD_PARTY_PACKAGES+=("$pkg")
         THIRD_PARTY_WITH_ORIGIN+=("${host}${SEP}${pkg}")
       fi
       continue
     fi
 
-    if ! printf "%s" "$result" | grep -qE "^(${vanilla_origins_re})$"; then
+    if ! grep -qE "^(${vanilla_origins_re})$" <<< "$result"; then
       THIRD_PARTY_PACKAGES+=("$pkg")
       THIRD_PARTY_WITH_ORIGIN+=("${result}${SEP}${pkg}")
     fi
