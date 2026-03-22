@@ -38,3 +38,29 @@ setup() {
   echo "$output" | grep -q 'local-lvm|'
   ! echo "$output" | grep -q 'zfs-local|'
 }
+
+@test "storage ID containing SEP character is silently dropped" {
+  # emit_storage_block guards against IDs or paths containing the internal
+  # separator (unit separator U+001F). A malicious storage.cfg entry with
+  # SEP in the id should be silently ignored, not propagated to wipe arrays.
+  local injected_cfg="$BATS_TEST_TMPDIR/storage-inject.cfg"
+  local sep=$'\037'
+  mkdir -p "$BATS_TEST_TMPDIR/injected"
+  printf "dir: injected%smalicious\n    path %s/injected\n    content iso\n" "$sep" "$BATS_TEST_TMPDIR" > "$injected_cfg"
+
+  run env STORAGE_CFG="$injected_cfg" PVE_SOFT_RESET_TEST_MODE=1 "$SCRIPT" --list-storage
+  [ "$status" -eq 0 ]
+  ! echo "$output" | grep -q 'injected'
+  ! echo "$output" | grep -q 'malicious'
+}
+
+@test "empty storage.cfg produces no planned actions" {
+  local empty_cfg="$BATS_TEST_TMPDIR/storage-empty.cfg"
+  : > "$empty_cfg"
+
+  run env STORAGE_CFG="$empty_cfg" PVE_SOFT_RESET_TEST_MODE=1 "$SCRIPT" --plan
+  [ "$status" -eq 0 ]
+  ! echo "$output" | grep -q 'Dir storage'
+  ! echo "$output" | grep -q 'LVM volumes'
+  ! echo "$output" | grep -q 'ZFS datasets'
+}

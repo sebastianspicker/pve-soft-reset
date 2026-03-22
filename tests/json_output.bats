@@ -56,3 +56,26 @@ setup() {
   echo "$output" | jq -e . >/dev/null
   printf '%s\n' "$output" | grep -q '^  "meta"'
 }
+
+@test "--json reports firewall_stack as nftables when nft succeeds" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+
+  # Override the default mock (which exits 1) to succeed
+  mock_cmd nft 'exit 0'
+
+  run env STORAGE_CFG="$STORAGE_CFG_PATH" PVE_SOFT_RESET_TEST_MODE=1 "$SCRIPT" --json
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.firewall_stack == "nftables"' >/dev/null
+}
+
+@test "--json reports ceph_found and ssh_keys_found boolean fields" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+
+  # Default mocks: /etc/ceph and /var/lib/ceph do not exist in test tmpdir,
+  # and /root/.ssh/authorized_keys is unlikely to have PVE keys.
+  # This test verifies the fields exist as booleans in the JSON output.
+  run env STORAGE_CFG="$STORAGE_CFG_PATH" PVE_SOFT_RESET_TEST_MODE=1 "$SCRIPT" --json
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.ceph_found | type == "boolean"' >/dev/null
+  echo "$output" | jq -e '.ssh_keys_found | type == "boolean"' >/dev/null
+}

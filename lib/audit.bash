@@ -98,12 +98,15 @@ emit_storage_block() {
       fi
       ;;
     lvm|lvmthin)
-      if [[ -n "$vgname" && "$vgname" != *"$SEP"* ]]; then
-        WIPE_LVM_VGS+=("${id}${SEP}${vgname}${SEP}${thinpool:-}")
+      if [[ -n "$vgname" && "$vgname" != *"$SEP"* && "$vgname" =~ ^[A-Za-z0-9+_.:/-]+$ ]]; then
+        local tp="${thinpool:-}"
+        if [[ -z "$tp" || "$tp" =~ ^[A-Za-z0-9+_.:/-]+$ ]]; then
+          WIPE_LVM_VGS+=("${id}${SEP}${vgname}${SEP}${tp}")
+        fi
       fi
       ;;
     zfspool)
-      if [[ -n "$thinpool" && "$thinpool" != *"$SEP"* ]]; then
+      if [[ -n "$thinpool" && "$thinpool" != *"$SEP"* && "$thinpool" =~ ^[A-Za-z0-9+_.:/-]+$ ]]; then
         WIPE_ZFS_POOLS+=("${id}${SEP}${thinpool}")
       fi
       ;;
@@ -127,10 +130,13 @@ audit_storage_cfg() {
     fi
 
     if [[ "$line" =~ ^([A-Za-z0-9_-]+):[[:space:]]*(.+)$ ]]; then
+      # Save BASH_REMATCH before emit_storage_block (which may clobber it via =~)
+      local _matched_type="${BASH_REMATCH[1]}"
+      local _matched_id="${BASH_REMATCH[2]}"
       emit_storage_block "$type" "$id" "$path" "$content" "$content_dirs" "$vgname" "$thinpool" "$disable" "$nodes_list"
 
-      type="${BASH_REMATCH[1]}"
-      id="$(trim "${BASH_REMATCH[2]}")"
+      type="$_matched_type"
+      id="$(trim "$_matched_id")"
       path=""
       content=""
       content_dirs=""

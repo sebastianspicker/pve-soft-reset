@@ -28,7 +28,7 @@ Unknown IDs in include/exclude produce usage exit code `2`.
 - `--no-sync`: skip sync after wipe phases.
 - `--no-color`: force colorless output.
 - `--verbose`: debug-style verbosity.
-- `--quiet`: warnings/errors only.
+- `--quiet`: warnings/errors only. Cannot be combined with `--verbose` (usage exit code `2`).
 - `--log-file <path>`: custom log file path.
 
 Safety notes:
@@ -37,7 +37,7 @@ Safety notes:
 
 ## Reset Flags
 
-- `--reset-pve-config`: reset guest configs, SDN, mappings, jobs, firewall, and HA.
+- `--reset-pve-config`: reset guest configs (VM/CT), SDN, resource mappings, jobs, firewall (host, cluster, alias/groups/ipset), HA, notification config, metric servers, vzdump defaults, pve-ssh-known_hosts, manager status files, node private directory, and task logs.
 - `--reset-users-datacenter`: reset users/ACL/secrets/datacenter to minimal defaults.
 - `--reset-storage-cfg`: overwrite storage.cfg with the vanilla default.
 - `--reset-all`: equivalent to all three reset flags above.

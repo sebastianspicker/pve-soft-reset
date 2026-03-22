@@ -46,20 +46,25 @@ flowchart TD
   E -->|"--list-storage"| M1["Print storage IDs"] --> X0["Exit 0"]
   E -->|"--json (--json-pretty optional)"| M2["Emit JSON object"] --> X0
   E -->|"--plan / --audit-only"| M3["Print preflight + planned actions"] --> X0
-  E -->|"--dry-run / execute"| F["Execution pipeline"]
+  E -->|"--dry-run"| F["Execution pipeline"]
+  E -->|"execute"| CONF{"Main confirmation prompt"}
+  CONF -->|"--non-interactive"| X3
+  CONF -->|"declined"| X0
+  CONF -->|"confirmed / --yes"| F
 
   subgraph F1["Execution Pipeline"]
     F --> F2["Safety guards"]
     F2 --> F3["Wipe dir/LVM/ZFS targets"]
     F3 --> F4["Config quorum gate + optional backup"]
-    F4 --> F5["Third-party purge"]
-    F5 --> F6{"Prompted destructive steps"}
-    F6 -->|"--non-interactive and prompt required"| X3
-    F6 -->|"confirmed / --yes"| F7["Optional reset actions"]
-    F7 --> F8["Final summary"]
+    F4 --> F5{"Third-party purge prompt"}
+    F5 -->|"confirmed / --yes / skipped"| F6["Third-party cleanup"]
+    F6 --> F7["PVE config reset (if --reset-pve-config)"]
+    F7 --> F8{"Per-feature prompts (ceph / ssh / users / storage)"}
+    F8 -->|"--non-interactive and prompt required"| X3
+    F8 -->|"each confirmed / --yes / skipped"| F9["Final summary"]
   end
 
-  F8 --> R{"Any failures?"}
+  F9 --> R{"Any failures?"}
   R -->|yes| X1["Exit 1 (runtime/partial failure)"]
   R -->|no| X0
 ```
@@ -71,10 +76,11 @@ flowchart TD
   L1["Start"] --> L2["Parse args + preflight"]
   L2 -->|"preflight fail"| E3["Exit 3"]
   L2 --> L3["Audit and scope"]
-  L3 --> L4["Render report context"]
 
-  L4 -->|"list-storage"| E0a["Exit 0"]
-  L4 -->|"json/json-pretty"| E0b["Exit 0"]
+  L3 -->|"list-storage"| E0a["Exit 0 (print IDs)"]
+  L3 -->|"json/json-pretty"| E0b["Exit 0 (emit JSON)"]
+
+  L3 --> L4["Render report context"]
   L4 -->|"plan/audit-only"| E0c["Exit 0"]
   L4 -->|"dry-run or execute"| L5["Run execution phases"]
 
@@ -87,7 +93,7 @@ flowchart TD
   L9 -->|"no"| E0d["Exit 0"]
 ```
 
-List-storage and json exit after the audit; plan and audit exit after the report; dry-run and execute continue through execution phases to the final summary.
+List-storage and json exit directly after the audit, before any report rendering. Plan and audit exit after the report. Dry-run and execute continue through execution phases to the final summary.
 
 ## Quickstart
 

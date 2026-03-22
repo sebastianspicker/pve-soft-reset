@@ -383,7 +383,7 @@ setup_runtime() {
   # shellcheck disable=SC2329
   cleanup_lock() {
     local rc=$?
-    rm -f "$lockfile" 2>/dev/null || true
+    rm -f "/run/pve-soft-reset.lock" 2>/dev/null || true
     exit "$rc"
   }
   trap cleanup_lock EXIT INT TERM

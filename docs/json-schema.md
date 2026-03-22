@@ -46,6 +46,8 @@ Examples:
 
 ## Validation Example
 
+Requires [`jq`](https://jqlang.github.io/jq/):
+
 ```bash
 ./pve-soft-reset.sh --json | jq -e .
 ```

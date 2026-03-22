@@ -72,6 +72,7 @@ General:
   ${c_opt}--plan${c_rst}                       Deterministic plan output, no execution, no prompts.
   ${c_opt}--list-storage${c_rst}               List discovered storage IDs and exit.
   ${c_opt}--json${c_rst}                       Output audit result JSON and exit.
+  ${c_opt}--json-pretty${c_rst}                Pretty-print JSON output (requires --json).
   ${c_opt}-y, --yes${c_rst}                    Skip confirmation prompts.
 
 Scope / UX:
@@ -98,7 +99,6 @@ Third-party purge:
 Meta:
   ${c_opt}--version${c_rst}                    Print version and exit.
   ${c_opt}--help${c_rst}                       Show this help.
-  ${c_opt}--json-pretty${c_rst}                Pretty-print JSON output (requires --json).
 
 Exit codes: 0 success, 1 runtime/partial failure, 2 usage error, 3 preflight/safety blocker.
 USAGE

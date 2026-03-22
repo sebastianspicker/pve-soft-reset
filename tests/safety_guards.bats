@@ -155,3 +155,22 @@ setup() {
   [ "$status" -eq 0 ]
   echo "$output" | grep -q 'Config files changed:[[:space:]]*0'
 }
+
+@test "--help displays usage text and exits with code 0" {
+  run env STORAGE_CFG="$STORAGE_CFG_PATH" PVE_SOFT_RESET_TEST_MODE=1 "$SCRIPT" --help
+  [ "$status" -eq 0 ]
+  echo "$output" | grep -q 'Usage:'
+  echo "$output" | grep -q '\-\-dry-run'
+}
+
+@test "--quiet and --verbose together exits with code 2" {
+  run env STORAGE_CFG="$STORAGE_CFG_PATH" PVE_SOFT_RESET_TEST_MODE=1 "$SCRIPT" --quiet --verbose --plan
+  [ "$status" -eq 2 ]
+  echo "$output" | grep -qi 'cannot be used together'
+}
+
+@test "unknown CLI option exits with code 2" {
+  run env STORAGE_CFG="$STORAGE_CFG_PATH" PVE_SOFT_RESET_TEST_MODE=1 "$SCRIPT" --this-flag-does-not-exist
+  [ "$status" -eq 2 ]
+  echo "$output" | grep -qi 'unknown option'
+}

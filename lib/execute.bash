@@ -284,7 +284,10 @@ execute_reset_users_datacenter() {
 execute_backup_pve_config() {
   local backup_file
   backup_file="/root/pve-backup-$(date +%Y%m%d-%H%M%S).tar.gz"
-  run_or_dry "Backup /etc/pve -> $backup_file" "Creating /etc/pve backup at $backup_file" false tar czf "$backup_file" /etc/pve
+  # Use restrictive umask (0077) so the backup is created 0600 -- it contains
+  # sensitive PVE data (shadow.cfg, API tokens, notification secrets, ACME keys).
+  # shellcheck disable=SC2016
+  run_or_dry "Backup /etc/pve -> $backup_file" "Creating /etc/pve backup at $backup_file" false bash -c 'umask 077; tar czf "$1" /etc/pve' _ "$backup_file"
 }
 
 execute_reset_storage_cfg() {
@@ -353,7 +356,7 @@ run_execution_phases() {
   fi
 
   if $BACKUP_CONFIG && { $RESET_PVE_CONFIG || $RESET_USERS_DATACENTER || $RESET_STORAGE_CFG; }; then
-    execute_backup_pve_config
+    execute_backup_pve_config || true
   fi
 
   if $PURGE_ALL_THIRD_PARTY && [[ ${#PURGE_PACKAGES[@]} -gt 0 ]]; then

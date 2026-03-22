@@ -3,9 +3,8 @@
 ## Local Checks
 
 ```bash
-bash -n pve-soft-reset.sh
-shellcheck -x pve-soft-reset.sh
-shellcheck -x lib/*.bash
+bash -n pve-soft-reset.sh lib/*.bash
+shellcheck -x pve-soft-reset.sh lib/*.bash
 ./scripts/check-doc-links.sh
 bats tests
 ```
@@ -15,9 +14,9 @@ bats tests
 - `tests/audit_storage.bats`: storage parsing, node/disabled handling, include/exclude scope.
 - `tests/audit_third_party.bats`: third-party package detection by origin, unknown-origin fallback, purge target inclusion.
 - `tests/execute_wipe.bats`: LVM/ZFS/dir wipe planned actions, protected volume exclusion, dry-run output.
-- `tests/json_output.bats`: JSON validity + stable array keys.
+- `tests/json_output.bats`: JSON validity, stable array keys, additive metadata fields (`meta.non_interactive`, `meta.scope`, `warnings`), and `--json-pretty` formatting.
 - `tests/reset_pve_config.bats`: PVE config reset for VM/CT/SDN/jobs artifacts, hostname validation guard.
-- `tests/safety_guards.bats`: usage/preflight exit codes, no-color, plan no-side-effect behavior, non-interactive/report-file/json-pretty guardrails.
+- `tests/safety_guards.bats`: usage/preflight exit codes, no-color, plan no-side-effect behavior, non-interactive/report-file/json-pretty guardrails, log-file path safety (symlink, /etc/pve, path traversal), report-file symlink/path-traversal rejection, ALLOWED_DIR_STORAGE_BASE blacklist for system paths, and dry-run config-change accounting.
 - `tests/fixtures/storage.cfg.basic`: canonical fixture with placeholder base path.
 - `tests/helpers/common.bash`: mock command setup for deterministic testing.
 

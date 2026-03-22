@@ -13,4 +13,5 @@ report-*.txt
 .cursor/
 .gemini/
 .claude/
+.ralph/
 progress.md
