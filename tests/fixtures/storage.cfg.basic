@@ -1,0 +1,22 @@
+dir: local
+    path __BASE__/local
+    content iso,backup,images
+
+lvmthin: local-lvm
+    vgname pve
+    thinpool data
+    content rootdir,images
+
+zfspool: zfs-local
+    pool rpool/data
+    content images,rootdir
+
+dir: disabled-store
+    path __BASE__/disabled
+    content iso
+    disable 1
+
+dir: other-node
+    path __BASE__/other
+    content iso
+    nodes node-b

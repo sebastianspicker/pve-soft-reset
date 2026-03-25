@@ -1,0 +1,45 @@
+=== bash pve-soft-reset.sh --help ===
+Usage: pve-soft-reset.sh [OPTIONS]
+
+  Without a mode flag, the script runs in execute mode (DESTRUCTIVE).
+  Always start with --plan or --dry-run to review what would happen.
+
+Modes (mutually exclusive, read-only unless noted):
+  --plan                       Show deterministic plan, no execution, no prompts.
+  --audit-only                 Run audit, print planned actions, exit.
+  --dry-run                    Simulate execution (no modifications).
+  --list-storage               List discovered storage IDs and exit.
+  --json                       Output audit result as JSON and exit.
+  --json-pretty                Pretty-print JSON output (requires --json).
+
+Scope / output:
+  --include-storage <csv>      Only include the listed storage IDs.
+  --exclude-storage <csv>      Exclude the listed storage IDs.
+  --report-file <path>         Write preflight/planned/summary report to file.
+  --no-color                   Disable ANSI colors.
+  --verbose                    Enable verbose output.
+  --quiet                      Minimal output (warnings/errors only).
+  --log-file <path>            Custom log file path.
+
+Execution control:
+  -y, --yes                    Skip confirmation prompts (DANGEROUS).
+  --non-interactive            Fail if an interactive confirmation would be required.
+  --no-sync                    Skip sync calls after wipe phases.
+  --backup-config              Back up /etc/pve before reset operations.
+
+Reset flags (DESTRUCTIVE -- each deletes or overwrites data):
+  --reset-pve-config           Delete guest configs, SDN, mappings, jobs, firewall, HA.
+  --reset-users-datacenter     Reset users/ACL/secrets/datacenter to minimal defaults.
+  --reset-storage-cfg          Overwrite storage.cfg with vanilla default.
+  --reset-all                  Equivalent to all three reset flags above.
+
+Third-party purge (DESTRUCTIVE):
+  --purge-all-third-party      Purge all detected non-vanilla packages.
+
+Meta:
+  --version                    Print version and exit.
+  --help                       Show this help.
+
+Exit codes: 0 success, 1 runtime/partial failure, 2 usage error, 3 preflight/safety blocker.
+
+Exit code: 0
